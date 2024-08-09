@@ -1,9 +1,10 @@
 #ifndef POLYNOMIAL_H
 #define POLYNOMIAL_H
-#include "stdio.h"
-#include "stdarg.h"
-#include "stdlib.h"
-#include "string.h"
+#endif
+#include <stdio.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define VARS "xyztwpqr"
 
@@ -23,7 +24,6 @@ monom *createMonomial(int dim, int *pow, float coef);
 void constructPolynom(int len, monom *m1, ...);
 
 void printPolynom(monom *p);
-#endif
 
 
 
