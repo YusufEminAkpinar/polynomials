@@ -1,124 +1,177 @@
 #include "./polynomials.h"
-#include "stdio.h"
-#include "stdlib.h"
-#include "string.h"
-
-#define VARS "xyztwpqr"
+#include <stdio.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 
 
 /*
- * struct Monomial{
- * 	int dim;
- * 	int *powers;
- * };
- * typedef struct Monomial mono;
- * 
- * struct Polynomial{
- * 	Monomial* monom;
- * 	float *coefs;
- * };
- * typedef struct Polynomial poly;
- *
-*/ 
+* struct Monomial{
+* 	int dim;
+* 	int *powers;
+* 	float coefficient;
+* 	struct Monomial *next;
+* 	struct Monomial *prev;
+* };
+*
+* typedef struct Monomial monom;
+*/
 
-struct Polynomial{
-	int monomialNumber; //Number of monomials 
-	int dim; // Dimension (Number of variables)
-	int **powers; // Array of powers 
-	float *coefs; // Array of coefficients
-};
-typedef struct Polynomial poly;
 
-void printPoly(poly *p){
+monom *createMonomial(int dim, int *pow, float coef){
+	monom *monomial = (monom *)malloc(sizeof(monom));
+	monomial->dim = dim;
+	monomial->powers = pow;
+	monomial->coefficient = coef;
+	monomial->next = NULL;
+	monomial->prev = NULL;
+	return monomial;
+}
+
+
+void constructPolynom(int len, monom *m1, ...){
+	va_list ap;
+	va_start(ap, m1);
+	monom *nextMon;
+	monom *tmp = m1;
+	for(int i=0; i<len-1; i++){
+		nextMon = va_arg(ap, monom*);
+		tmp->next = nextMon;
+		nextMon->prev = tmp;
+		tmp = nextMon;
+	}
+}
+
+
+void printPolynom(monom *p){
 	int dim = p->dim;
 	if (dim > 8){
 		printf("Dim is too large, quitting\n");
 		exit(1);
 	}
-	for(int i=0; i<p->monomialNumber; i++){
-		//if (p->coefs[i] != 1)
-		printf("%d", (int)p->coefs[i]);
-		for(int j=0; j<dim; j++){
-			if (p->powers[i][j] == 1)
-				printf("*%c", VARS[j]);
-			else if (p->powers[i][j])
-				printf("*%c^%d", VARS[j], p->powers[i][j]);
+	monom *tmp = p;
+
+    if (tmp->coefficient == 0) tmp=tmp->next;
+	if (tmp != NULL) {
+		printf("%.1f", tmp->coefficient);
+		for(int i=0; i<dim; i++){
+			if (tmp->powers[i] == 1)
+				printf("*%c", VARS[i]);
+			else if (tmp->powers[i])
+				printf("*%c^%d ", VARS[i], tmp->powers[i]);
 		}
-		if(i != p->monomialNumber-1)
-			printf(" + ");
-		else
-			printf("\n");
+		tmp = tmp->next;
 	}
-}
-
-// I malloc'd two times. It's a waste of space.
-poly *createPolynom(int monomial, int dim, int **pow, float *coef){
-	poly *polynom = (poly *)malloc(sizeof(poly));
-	polynom->monomialNumber = monomial;
-	polynom->dim = dim;
-	polynom->powers = pow;
-	polynom->coefs = coef;
-	return polynom;
-}
-
-void freePolynom(poly *polynom){
-	free(polynom->coefs);
-	for(int i=0; i<polynom->monomialNumber; i++){
-		free(polynom->powers[i]);
+	while (tmp != NULL){
+        if (tmp->coefficient == 0) tmp=tmp->next;
+		//Print monomial here
+		printf("+ %.1f", tmp->coefficient);
+		for(int i=0; i<dim; i++){
+			if (tmp->powers[i] == 1)
+				printf("*%c", VARS[i]);
+			else if (tmp->powers[i])
+				printf("*%c^%d ", VARS[i], tmp->powers[i]);
+		}
+		tmp = tmp->next;
 	}
-	free(polynom->powers);
-	free(polynom);
+	printf("\n");
 }
 
-//poly *product(poly *p1, poly *p2){
 
-//}
+// Sum up the monomials with same exponent.
+void tideUp(monom *m){
+    monom *tmp = m;
+    int isEqual;
+    while(m->next != NULL){
+        tmp = m->next;
+        while(tmp != NULL){
+            isEqual = 0;
+            for (int i = 0; i < m->dim; i++)
+                if (m->powers[i] == tmp->powers[i]) isEqual++;
+            if(isEqual == m->dim){
+                m->coefficient += tmp->coefficient;
+                if (tmp->next != NULL){
+                    tmp->prev->next = tmp->next;
+                    tmp->next->prev = tmp->prev; //Do not deref NULL pointer
+                }else {
+                    tmp->prev->next = NULL;
+                    free(tmp->powers);
+                    free(tmp);
+                    return;
+                }
+                free(tmp->powers);
+                free(tmp);
+            }
+            tmp = tmp->next;
+        }
+        m = m->next;
+    }
+}
+
+
+monom *product(monom *m1, monom* m2){
+	monom *prod;
+    int dim = m1->dim, *power = malloc(sizeof(int) * dim), k = 1;
+    memset(power, 0, sizeof(int) * dim);
+    prod = createMonomial(dim, power, 0);
+
+    monom *tmp, *previous;
+    for(monom *tmp1 = m1; tmp1 != NULL; tmp1=tmp1->next){
+        for (monom *tmp2 = m2; tmp2 != NULL; tmp2=tmp2->next){
+            for (int i=0; i<dim; i++) power[i] = tmp1->powers[i] + tmp2->powers[i];
+
+            tmp = createMonomial(dim, power, tmp1->coefficient * tmp2->coefficient);
+            memset(power, 0, sizeof(int) * dim);
+            if (k){
+                prod = tmp;
+                previous = prod;
+                k--;
+            }
+            printPolynom(tmp);
+
+            previous->next = tmp;
+            tmp->prev = previous;
+            
+            previous = tmp;
+        }
+    }
+	
+    return prod;
+}
+
 
 int main(int argc, char **argv){
 	(void) argc;
 	(void) argv;
-	int dimension = 3;
-	int monom = 3;
-	int **pow = (int **)malloc(sizeof(int) * dimension * monom);
-	for(int i=0;i<monom; i++){
-		pow[i] = (int *)malloc(sizeof(int) * dimension);
-	}
-	float *coefs = (float *)malloc(sizeof(float) * monom);
-	// xy^2 + 5x^2y + 3y
-	// 3x^3y^2 + y^31z^2+12
-	pow[0][0] = 3;
-	pow[0][1] = 2;
-	pow[0][2] = 0;
-	pow[1][0] = 0;
-	pow[1][1] = 31;
-	pow[1][2] = 2;
-	pow[2][0] = 0;
-	pow[2][1] = 0;
-	pow[2][2] = 0;
-	coefs[0] = 3;
-	coefs[1] = 1;
-	coefs[2] = 12;
-	poly *P = createPolynom(monom, dimension, pow, coefs);
-	//poly P = {
-	//	.monomialNumber = 3,
-	//	.dim = 2,
-	//	//.powers = {{1,2}, {2,1}, {0,1}},
-	//	.powers = pow,
-	//	.coefs = coefs
-	//};
-	printPoly(P);
-	freePolynom(P);
+	int dim = 2;
+	int *pow1 = malloc(sizeof(int) * dim);
+	pow1[0] = 1; pow1[1] = 2;
+	int *pow2 = malloc(sizeof(int) * dim);
+	pow2[0] = 1; pow2[1] = 3;
+	int *pow3 = malloc(sizeof(int) * dim);
+	pow3[0] = 0; pow3[1] = 3;
+	int *pow4 = malloc(sizeof(int) * dim);
+	pow4[0] = 2; pow4[1] = 3;
+	int coef1 = 2;
+	int coef2 = 5;
+	int coef3 = 1;
+	int coef4 = 3;
+	monom* m1 = createMonomial(dim, pow1, coef1);
+	monom* m2 = createMonomial(dim, pow2, coef2);
+	monom* m3 = createMonomial(dim, pow3, coef3);
+	monom* m4 = createMonomial(dim, pow4, coef4);
+	constructPolynom(2, m1, m2);
+	constructPolynom(2, m3, m4);
+    printf("first one is: ");
+	printPolynom(m1);
+    
+    printf("second one is: ");
+    printPolynom(m3);
+
+    printf("Product is: ");
+    monom *prod = product(m1, m3);
+    printPolynom(prod);
+
 	return 0;
 }
-
-// p1 => deg=3, dim=2, powers = [[1, 2], [1,4], [2,3]]
-//poly *multiplication(poly p1, poly p2){
-//	return NULL;
-//}
-
-
-
-
-
-
 
